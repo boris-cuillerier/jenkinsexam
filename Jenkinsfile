@@ -7,6 +7,7 @@ pipeline {
         HELM_CHART_NAME = "examjenkins"
         HELM_CHART_VERSION = "0.1.0"
         KUBECONFIG_SECRET = credentials("config") // Jenkins credential ID for kubeconfig file
+	DOCKER_TAG = ""
     }
     
     stages {
