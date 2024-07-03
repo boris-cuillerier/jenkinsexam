@@ -1,134 +1,44 @@
 pipeline {
-environment { // Declaration of environment variables
-DOCKER_ID = "bobdatascientest" // replace this with your docker-id
-DOCKER_IMAGE = "jenkinsexam"
-DOCKER_TAG = "v.${BUILD_ID}.0" // we will tag our images with the current build in order to increment the value by 1 with each new build
-}
-agent any // Jenkins will be able to select all available agents
-stages {
-        stage(' Docker Build'){ // docker build image stage
+    agent any
+    
+    environment {
+        DOCKER_ID = "bobdatascientest/jenkinsexam" // Replace with your Docker Hub ID
+        DOCKER_COMPOSE_FILE = "docker-compose.yml"
+        HELM_CHART_NAME = "examjenkins"
+        HELM_CHART_VERSION = "0.1.0"
+        KUBECONFIG_SECRET = credentials("config") // Jenkins credential ID for kubeconfig file
+    }
+    
+    stages {
+        stage('Build and Push Docker Images') {
             steps {
                 script {
-                sh '''
-                 docker rm -f jenkins
-                 docker build -t $DOCKER_ID/$DOCKER_IMAGE:$DOCKER_TAG .
-                sleep 6
-                '''
+                    // Build images from docker-compose.yml
+                    sh "docker-compose -f $DOCKER_COMPOSE_FILE build"
+                    
+                    // Tag and push images to Docker Hub
+                    sh "docker-compose -f $DOCKER_COMPOSE_FILE push"
                 }
             }
         }
-        stage('Docker run'){ // run container from our builded image
-                steps {
-                    script {
-                    sh '''
-                    docker run -d -p 80:80 --name jenkins $DOCKER_ID/$DOCKER_IMAGE:$DOCKER_TAG
-                    sleep 10
-                    '''
+        
+        stage('Deploy to Kubernetes') {
+            steps {
+                script {
+                    
+                    // Loop through namespaces and deploy with Helm
+                    def namespaces = ["dev", "qa", "staging", "prod"]
+                    
+                    for (def namespace in namespaces) {
+                        sh """
+                        cp examjenkins/values.yaml values-${namespace}.yaml
+                        sed -i "s+tag: .*+tag: ${DOCKER_TAG}+g" values-${namespace}.yaml
+                        helm upgrade --install $HELM_CHART_NAME ./examjenkins-${HELM_CHART_VERSION}.tgz --values=values-${namespace}.yaml --namespace $namespace
+                        """
                     }
                 }
             }
-        stage('Docker Push'){ //we pass the built image to our docker hub account
-            environment
-            {
-                DOCKER_PASS = credentials("DOCKER_HUB_PASS") // we retrieve  docker password from secret text called docker_hub_pass saved on jenkins
-            }
-
-            steps {
-
-                script {
-                sh '''
-                docker login -u $DOCKER_ID -p $DOCKER_PASS
-                docker push $DOCKER_ID/$DOCKER_IMAGE:$DOCKER_TAG
-                '''
-                }
-            }
-
         }
-
-stage('Deploiement en dev'){
-        environment
-        {
-        KUBECONFIG = credentials("config") // we retrieve  kubeconfig from secret file called config saved on jenkins
-        }
-            steps {
-                script {
-                sh '''
-                rm -Rf .kube
-                mkdir .kube
-                ls
-                cat $KUBECONFIG > .kube/config
-                cp examjenkins/values.yaml values.yml
-                cat values.yml
-                sed -i "s+tag.*+tag: ${DOCKER_TAG}+g" values.yml
-                helm upgrade --install app fastapi --values=values.yml --namespace dev
-                '''
-                }
-            }
-
-        }
-stage('Deploiement en QA'){
-        environment
-        {
-        KUBECONFIG = credentials("config") // we retrieve  kubeconfig from secret file called config saved on jenkins
-        }
-            steps {
-                script {
-                sh '''
-                rm -Rf .kube
-                mkdir .kube
-                ls
-                cat $KUBECONFIG > .kube/config
-                cp examjenkins/values.yaml values.yml
-                cat values.yml
-                sed -i "s+tag.*+tag: ${DOCKER_TAG}+g" values.yml
-                helm upgrade --install app fastapi --values=values.yml --namespace qa
-                '''
-                }
-            }
-
-        }
-stage('Deploiement en staging'){
-        environment
-        {
-        KUBECONFIG = credentials("config") // we retrieve  kubeconfig from secret file called config saved on jenkins
-        }
-            steps {
-                script {
-                sh '''
-                rm -Rf .kube
-                mkdir .kube
-                ls
-                cat $KUBECONFIG > .kube/config
-                cp examjenkins/values.yaml values.yml
-                cat values.yml
-                sed -i "s+tag.*+tag: ${DOCKER_TAG}+g" values.yml
-                helm upgrade --install app fastapi --values=values.yml --namespace staging
-                '''
-                }
-            }
-
-        }
-  stage('Deploiement en prod'){
-        environment
-        {
-        KUBECONFIG = credentials("config") // we retrieve  kubeconfig from secret file called config saved on jenkins
-        }
-            steps {
-                script {
-                sh '''
-                rm -Rf .kube
-                mkdir .kube
-                ls
-                cat $KUBECONFIG > .kube/config
-                cp examjenkins/values.yaml values.yml
-                cat values.yml
-                sed -i "s+tag.*+tag: ${DOCKER_TAG}+g" values.yml
-                helm upgrade --install app fastapi --values=values.yml --namespace prod
-                '''
-                }
-            }
-
-        }
-
+    }
 }
-}
+
