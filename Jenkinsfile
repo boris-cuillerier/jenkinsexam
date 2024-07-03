@@ -9,6 +9,7 @@ pipeline {
         KUBECONFIG_SECRET = credentials("config") // Jenkins credential ID for kubeconfig file
         DOCKER_TAG = ""
         GIT_CREDENTIALS = credentials('GIT_CREDENTIALS') // Jenkins credential ID for Git credentials
+        DOCKER_HUB_CREDENTIALS = credentials('DOCKER_HUB_CREDENTIALS') // Jenkins credential ID for Docker Hub credentials
     }
 
     stages {
@@ -16,7 +17,7 @@ pipeline {
             steps {
                 script {
                     // Use Docker Hub credentials to login
-                    withCredentials([usernamePassword(credentialsId: 'GIT_CREDENTIALS', usernameVariable: 'GIT_USER', passwordVariable: 'GIT_PASS')]) {
+                    withCredentials([usernamePassword(credentialsId: 'DOCKER_HUB_CREDENTIALS', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
                         sh """
                         docker login -u $DOCKER_USER -p $DOCKER_PASS
                         """
