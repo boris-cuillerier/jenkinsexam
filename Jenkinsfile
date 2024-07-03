@@ -8,15 +8,18 @@ pipeline {
         HELM_CHART_VERSION = "0.1.0"
         KUBECONFIG_SECRET = credentials("config") // Jenkins credential ID for kubeconfig file
         DOCKER_TAG = ""
+        GIT_CREDENTIALS = credentials('GIT_CREDENTIALS') // Jenkins credential ID for Git credentials
     }
 
     stages {
         stage('Build and Push Docker Images') {
             steps {
-                withCredentials([usernamePassword(credentialsId: 'DOCKER_HUB_PASS', usernameVariable: 'DOCKER_ID', passwordVariable: 'DOCKER_PASS')]) {
-                    script {
-                        // Log in to Docker Hub
-                        sh "docker login -u $DOCKER_ID -p $DOCKER_PASS"
+                script {
+                    // Use Docker Hub credentials to login
+                    withCredentials([usernamePassword(credentialsId: 'GIT_CREDENTIALS', usernameVariable: 'GIT_USER', passwordVariable: 'GIT_PASS')]) {
+                        sh """
+                        docker login -u $DOCKER_USER -p $DOCKER_PASS
+                        """
 
                         // Build and push images using docker-compose
                         sh "docker-compose -f $DOCKER_COMPOSE_FILE build"
