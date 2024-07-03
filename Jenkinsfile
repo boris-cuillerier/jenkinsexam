@@ -3,7 +3,8 @@ pipeline {
 
     environment {
         DOCKER_ID = "bobdatascientest/jenkinsexam" // Replace with your Docker Hub ID
-        DOCKER_COMPOSE_FILE = "docker-compose.yml"
+        DOCKER_PASS
+	DOCKER_COMPOSE_FILE = "docker-compose.yml"
         HELM_CHART_NAME = "examjenkins"
         HELM_CHART_VERSION = "0.1.0"
         KUBECONFIG_SECRET = credentials("config") // Jenkins credential ID for kubeconfig file
@@ -12,9 +13,17 @@ pipeline {
 
     stages {
         stage('Build and Push Docker Images') {
+	    environment {
+                DOCKER_PASS = credentials('DOCKER_HUB_PASS')
+            }
             steps {
                 script {
-                    // Build and push images using docker-compose
+                    sh """
+		    docker login -u $DOCKER_ID -p $DOCKER_PASS
+		    docker push $DOCKER_ID/$HELM_CHART_NAME:$DOCKER_TAG
+	            """
+
+		    // Build and push images using docker-compose
                     sh "docker-compose -f $DOCKER_COMPOSE_FILE build"
                     sh "docker-compose -f $DOCKER_COMPOSE_FILE push"
                     
